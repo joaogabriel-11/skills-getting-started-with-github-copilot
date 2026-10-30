@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -24,8 +25,45 @@ document.addEventListener("DOMContentLoaded", () => {
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p class="availability"><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants">
+            <h5>Participants</h5>
+            <ul>
+              ${details.participants.length > 0
+                ? details.participants.map((participant) => `
+                    <li>
+                      <span>${participant}</span>
+                      <button class="remove-participant" type="button" title="Remove ${participant}" aria-label="Remove ${participant}" data-email="${participant}">&times;</button>
+                    </li>
+                  `).join("")
+                : "<li class=\"no-participants\">No participants yet</li>"}
+            </ul>
+          </div>
         `;
+
+        activityCard.querySelectorAll(".remove-participant").forEach((removeButton) => {
+          removeButton.addEventListener("click", async () => {
+            const participant = removeButton.dataset.email;
+            const response = await fetch(
+              `/activities/${encodeURIComponent(name)}/participants/${encodeURIComponent(participant)}`,
+              { method: "DELETE" }
+            );
+
+            if (!response.ok) {
+              return;
+            }
+
+            removeButton.closest("li").remove();
+            details.participants = details.participants.filter((email) => email !== participant);
+            activityCard.querySelector(".availability").innerHTML =
+              `<strong>Availability:</strong> ${details.max_participants - details.participants.length} spots left`;
+
+            if (details.participants.length === 0) {
+              activityCard.querySelector("ul").innerHTML =
+                '<li class="no-participants">No participants yet</li>';
+            }
+          });
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -62,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
